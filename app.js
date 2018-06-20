@@ -12,19 +12,6 @@ app.get('/', (req, res) => {
     })
 })
 
-// app.get("/:ip", (req,res) =>{
-//       console.log(req.params.ip);
-//       for(var i=0;i<ips.length;i++)
-//       {
-//         if(ips[i] == req.params.ip)
-//         {
-//           console.log(req.params.ip);
-//           res.render("index", {ip:req.params.ip});
-//           break;
-//         }
-//       }
-// });
-
 function isNumeric(n) {
     return !isNaN(parseFloat(n)) && isFinite(n);
 }
@@ -33,7 +20,6 @@ function ValidateIPaddress(ipaddress) {
     if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {
         return (true)
     }
-    //alert("You have entered an invalid IP address!")  
     return (false)
 }
 
@@ -49,11 +35,11 @@ io.sockets.on('connection', (socket) => {
 
     socket.on('change_username', (data) => {
         socket.username = data.username
-        console.log(socket.username);
         users[socket.username] = socket;
     })
+
     users[socket.username] = socket;
-    // console.log(users);
+
     socket.on('new_message', (data) => {
         var msg = data.message.trim();
         if (msg.substr(0, 3) == "/w ") {
@@ -63,19 +49,23 @@ io.sockets.on('connection', (socket) => {
                 var name = msg.substr(0, ind);
                 var msg = msg.substr(ind + 1);
                 if (name in users) {
-                    console.log(data.name);
                     users[name].emit("new_message", {
                         message: msg,
-                        username: socket.username
+                        username: socket.username + " whispered to you"// + name
                     })
                     users[data.name].emit("new_message", {
                         message: msg,
-                        username: socket.username
+                        username: "You whispered to " + name
                     })
                     console.log("Whisper");
                 } 
                 else 
                 {
+                  console.log(data.name);
+                    users[data.name].emit("new_message", {
+                        message: "Wrong username",
+                        username: "Liveweaver"
+                    })
                     console.log("User not found");
                 }
             } else {
@@ -88,15 +78,6 @@ io.sockets.on('connection', (socket) => {
             });
         }
 
-        // if(ValidateIPaddress(data.message))
-        // {
-        //       // io.sockets.emit('new_message', {message : "Chat room for" + socket.username + " on requested IP has been created.", username : "Liveweaver"});
-
-        // }
-        // else
-        // {
-        //       io.sockets.emit('new_message', {message : data.message, username : socket.username});
-        // }
         // if(isNumeric(data.message))
         // {
         //     if(data.message<100)
