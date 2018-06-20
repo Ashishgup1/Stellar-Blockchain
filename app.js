@@ -1,7 +1,12 @@
+const alert = require ('alert-node')
+
 const express = require('express')
 const app = express()
 
 var users = {};
+
+users["Anonymous"]=null
+
 app.set('view engine', 'ejs')
 
 app.use(express.static('public'))
@@ -34,8 +39,18 @@ io.sockets.on('connection', (socket) => {
     socket.username = "Anonymous"
 
     socket.on('change_username', (data) => {
-        socket.username = data.username
-        users[socket.username] = socket;
+        if(data.username in users)
+        {
+            users[socket.username].emit("new_message", {
+            message: "Username already taken",
+            username: "Liveweaver"
+          })
+        }
+        else
+        {
+          socket.username = data.username
+          users[socket.username] = socket;
+        }
     })
 
     users[socket.username] = socket;
@@ -66,6 +81,7 @@ io.sockets.on('connection', (socket) => {
                         message: "Wrong username",
                         username: "Liveweaver"
                     })
+                    alert("Error", "Wrong username entered");
                     console.log("User not found");
                 }
             } else {
@@ -78,15 +94,6 @@ io.sockets.on('connection', (socket) => {
             });
         }
 
-        // if(isNumeric(data.message))
-        // {
-        //     if(data.message<100)
-        //       io.sockets.emit('new_message', {message : "Token amount too low", username : "Liveweaver"});
-
-        //     if(data.message>=100)
-        //       io.sockets.emit('new_message', {message : "Sufficient Tokens", username : "Liveweaver"});
-        // }
-
     })
 
     socket.on('typing', (data) => {
@@ -94,4 +101,12 @@ io.sockets.on('connection', (socket) => {
             username: socket.username
         })
     })
+
+    socket.on('disconnect', (data) => {
+        io.sockets.emit('new_message', {
+              message: socket.username + " has left",
+              username: "Liveweaver"
+          });
+    })
+
 })
