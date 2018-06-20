@@ -8,6 +8,7 @@ $(function(){
 	var feedback = $("#feedback")
 	var hiddenInput = $("#address")
 	var ip = hiddenInput.attr("value")
+
 	var socket = io.connect("http://192.168.137.31:3000");
 
 	function ValidateIPaddress(ipaddress) {  
@@ -49,4 +50,9 @@ $(function(){
 	socket.on('typing', (data) => {
 		feedback.html("<p><i>" + data.username + " is typing a message..." + "</i></p>")
 	})
+
+	socket.on('disconnect', (data) => {
+	 	socket.emit('disconnect', {name: username.val()})
+  	});
+
 });
