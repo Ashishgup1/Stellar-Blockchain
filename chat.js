@@ -1,20 +1,36 @@
 $(function(){
 
-	var socket = io.connect('http://192.168.137.31:3000')
-	//buttons and inputs
 	var message = $("#message")
 	var username = $("#username")
 	var send_message = $("#send_message")
 	var send_username = $("#send_username")
 	var chatroom = $("#chatroom")
 	var feedback = $("#feedback")
+	var hiddenInput = $("#address")
+	var ip = hiddenInput.attr("value")
+	var socket = io.connect("http://192.168.137.31:3000");
 
-	//Emit message
-	send_message.click(function(){
-		socket.emit('new_message', {message : message.val()})
+	function ValidateIPaddress(ipaddress) {  
+	  if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {  
+	    return (true)  
+	  }   
+	  return (false)  
+	}  
+
+	message.keypress(function(event){
+		console.log(event);
+		if(event.which == 13)
+		{
+			var possibleIp = message.val();
+			socket.emit('new_message', {message : message.val(), ip: ip, name:username.val()})
+		}
 	})
 
-	//Listen on new_message
+	send_message.on("click", function(){
+		var possibleIp = message.val();
+		socket.emit('new_message', {message : message.val(), ip: ip, name:username.val()})
+	})
+
 	socket.on("new_message", (data) => {
 
 		feedback.html('');
@@ -22,26 +38,15 @@ $(function(){
 		chatroom.append("<p class='message'>" + data.username + ": " + data.message + "</p>")
 	})
 
-	//Emit a username
 	send_username.click(function(){
 		socket.emit('change_username', {username : username.val()})
 	})
 
-	//Emit typing
 	message.bind("keypress", () => {
 		socket.emit('typing')
 	})
 
-	//Listen on typing
 	socket.on('typing', (data) => {
 		feedback.html("<p><i>" + data.username + " is typing a message..." + "</i></p>")
 	})
 });
-
-  /*var getIP = require('ipware')().get_ip;
-  app.use(function(req, res, next) {
-    var ipInfo = getIP(req);
-    console.log("HELLLLLLLLLLLLLLLLLLLLLLLLO");
-    // { clientIp: '127.0.0.1', clientIpRoutable: false }
-    next();
-  });*/
