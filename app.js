@@ -27,14 +27,25 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 
 async function pushToElasticSearch(fileData) { //Used to push a user data to elastic search
 
-	let { count } = await client.count({
-  		index: 'index_name'
+	let count = {};
+
+	try
+	{
+		count = await client.count({
+  		index: 'user_data'
 		});
+	}
 	
+	catch(err)
+	{
+		console.log(err);
+		count.count = 0;
+	}
+
 	var obj = {
 		index: 'user_data',
 		type: 'user',
-		id: count + 1
+		id: count.count + 1
 	};
 
 	obj.body = fileData;
