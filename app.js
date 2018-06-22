@@ -4,6 +4,8 @@ var elasticsearch = require('elasticsearch');
 
 let idcount = 1;
 
+let anoncnt = 1;
+
 var client = new elasticsearch.Client({
 	host: '10.4.100.238:9200',
 	log: 'trace'
@@ -83,9 +85,14 @@ const io = require("socket.io")(server)
 
 io.sockets.on('connection', (socket) => {
 
-	console.log('New user connected')
+	socket.username = "Anonymous" + anoncnt;
 
-	socket.username = "Anonymous"
+	anoncnt++;
+
+	socket.broadcast.emit('new_message', {
+		message: socket.username + " has joined the chat",
+		username: "Liveweaver"
+	});
 
 	socket.on('change_username', (data) => {
 		if(data.username in users)
