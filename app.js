@@ -2,8 +2,6 @@
 
 var elasticsearch = require('elasticsearch');
 
-let idcount = 1;
-
 let anoncnt = 1;
 
 var client = new elasticsearch.Client({
@@ -27,15 +25,17 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 	return searchResults;
 }
 
-function pushToElasticSearch(fileData) { //Used to push a user data to elastic search
+async function pushToElasticSearch(fileData) { //Used to push a user data to elastic search
 
+	let { count } = await client.count({
+  		index: 'index_name'
+		});
+	
 	var obj = {
 		index: 'user_data',
 		type: 'user',
-		id: idcount
+		id: count + 1
 	};
-
-	idcount += 1;
 
 	obj.body = fileData;
 	client.create(obj, function(error) {
@@ -161,7 +161,7 @@ io.sockets.on('connection', (socket) => {
 				Keywords : keywords
 			};
 
-			pushToElasticSearch(fileData);
+			await pushToElasticSearch(fileData);
 
 			io.sockets.emit('new_message', {
 				message: data.message,
