@@ -69,6 +69,10 @@ var users = {};
 var timer = {};
 var buyer = {};
 var sender = {};
+var checkflag = {};
+var inprocess = {};
+var publickey = {};
+var secretkey = {};
 
 users["Anonymous"]=null
 
@@ -133,117 +137,130 @@ io.sockets.on('connection', (socket) => {
 	users[socket.username] = socket;
 
 	socket.on('new_message', async (data) => {
+
 		var msg = data.message.trim();
-		if (msg.substr(0, 3) == "/w ") {
-			msg = msg.substr(3);
-			var ind = msg.indexOf(" ");
-			if (ind !== -1) {
-				var name = msg.substr(0, ind);
-				var msg = msg.substr(ind + 1);
-				if (name in users) {
-					users[name].emit("new_message", {
-						message: msg,
-						username: socket.username + " whispered to you"// + name
-					})
-					users[data.name].emit("new_message", {
-						message: msg,
-						username: "You whispered to " + name
-					})
-					console.log("Whisper");
+		if(checkflag[socket.username]!=1)
+		{
+			if(msg.substr(0, 3) == "/w ") {
+				msg = msg.substr(3);
+				var ind = msg.indexOf(" ");
+				if (ind !== -1) {
+					var name = msg.substr(0, ind);
+					var msg = msg.substr(ind + 1);
+					if (name in users) {
+						users[name].emit("new_message", {
+							message: msg,
+							username: socket.username + " whispered to you"// + name
+						})
+						users[data.name].emit("new_message", {
+							message: msg,
+							username: "You whispered to " + name
+						})
+						console.log("Whisper");
+					} 
+					else 
+					{
+						console.log(data.name);
+						users[data.name].emit("new_message", {
+							message: "Wrong username",
+							username: "Liveweaver"
+						})
+						alert("Error", "Wrong username entered");
+						console.log("User not found");
+					}
 				} 
 				else 
 				{
-					console.log(data.name);
-					users[data.name].emit("new_message", {
-						message: "Wrong username",
-						username: "Liveweaver"
-					})
-					alert("Error", "Wrong username entered");
-					console.log("User not found");
+					console.log("Fail");
 				}
 			} 
-			else 
+			else if(msg.substr(0, 4)=="add ")
 			{
-				console.log("Fail");
+				var keywords=msg.substr(4);
+
+				let fileData = {
+					username : socket.username,
+					Keywords : keywords
+				};
+
+				await pushToElasticSearch(fileData);
+
+				io.sockets.emit('new_message', {
+					message: data.message,
+					username: socket.username
+				});
 			}
-		} 
-		else if(msg.substr(0, 4)=="add ")
-		{
-			var keywords=msg.substr(4);
-
-			let fileData = {
-				username : socket.username,
-				Keywords : keywords
-			};
-
-			await pushToElasticSearch(fileData);
-
-			io.sockets.emit('new_message', {
-				message: data.message,
-				username: socket.username
-			});
-		}
-		else if(msg.substr(0, 9)=="retrieve ")
-		{
-			var keywords=msg.substr(9);
-
-			var usernames= await getPossibleUserNames(keywords);
-
-			users[socket.username].emit('new_message', {
-				message: "These usernames have the required information:\n" + usernames,
-				username: "Liveweaver"
-			});
-
-		}
-		else if(msg.substr(0,5)=="send ")
-		{
-			var user=msg.split(" ");
-			var name=user[1];
-			var amount=user[2];
-			users[name].emit('new_message', {
-				message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
-				username: "Liveweaver"
-			});
-			sender[socket.username]=name;
-			buyer[name]=socket.username;
-			timer[socket.username]=Date.now();
-		}
-		else if(msg=="Y"||msg=="N")
-		{
-			if(socket.username in buyer)
+			else if(msg.substr(0, 9)=="retrieve ")
 			{
-				if(Date.now()-timer[buyer[socket.username]]<=10000)
+				var keywords=msg.substr(9);
+
+				var usernames= await getPossibleUserNames(keywords);
+
+				users[socket.username].emit('new_message', {
+					message: "These usernames have the required information:\n" + usernames,
+					username: "Liveweaver"
+				});
+
+			}
+			else if(msg.substr(0,5)=="send ")
+			{
+				var user=msg.split(" ");
+				var name=user[1];
+				var amount=user[2];
+				users[name].emit('new_message', {
+					message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
+					username: "Liveweaver"
+				});
+				sender[socket.username]=name;
+				buyer[name]=socket.username;
+				timer[socket.username]=Date.now();
+			}
+			else if(msg=="Y"||msg=="N")
+			{
+				if(socket.username in buyer)
 				{
-					if(msg=="Y")
+					if(Date.now()-timer[buyer[socket.username]]<=10000)
 					{
-						users[socket.username].emit('new_message', 
+						if(msg=="Y")
 						{
-							message: "Transaction has been accepted",
-							username: "Liveweaver"
-						});
-						users[buyer[socket.username]].emit('new_message', 
+							users[socket.username].emit('new_message', 
+							{
+								message: "Transaction has been accepted. Enter your public and secret key separated by a space.",
+								username: "Liveweaver"
+							});
+							users[buyer[socket.username]].emit('new_message', 
+							{
+								message: socket.username+" has accepted the transaction. Enter your public and secret key separated by a space.",
+								username: "Liveweaver"
+							});
+							checkflag[buyer[socket.username]]=1;
+							checkflag[socket.username]=1;
+							inprocess[buyer[socket.username]]=socket.username;
+						}		
+						else
 						{
-							message: socket.username+" has accepted the transaction",
-							username: "Liveweaver"
-						});
-						delete sender[buyer[socket.username]];
-						delete buyer[socket.username];
-					}		
+							users[socket.username].emit('new_message', 
+							{
+								message: "Transaction has been denied",
+								username: "Liveweaver"
+							});
+							users[buyer[socket.username]].emit('new_message', 
+							{
+								message: socket.username+" has denied the transaction",
+								username: "Liveweaver"
+							});
+							delete sender[buyer[socket.username]];
+							delete buyer[socket.username];
+						}	
+					}
 					else
 					{
 						users[socket.username].emit('new_message', 
 						{
-							message: "Transaction has been denied",
+							message: "No valid transaction exists",
 							username: "Liveweaver"
 						});
-						users[buyer[socket.username]].emit('new_message', 
-						{
-							message: socket.username+" has denied the transaction",
-							username: "Liveweaver"
-						});
-						delete sender[buyer[socket.username]];
-						delete buyer[socket.username];
-					}	
+					}
 				}
 				else
 				{
@@ -254,23 +271,26 @@ io.sockets.on('connection', (socket) => {
 					});
 				}
 			}
-			else
+			else 
 			{
-				users[socket.username].emit('new_message', 
-				{
-					message: "No valid transaction exists",
-					username: "Liveweaver"
+				io.sockets.emit('new_message', {
+					message: data.message,
+					username: socket.username
 				});
 			}
 		}
-		else 
+		else
 		{
-			io.sockets.emit('new_message', {
-				message: data.message,
-				username: socket.username
-			});
-		}
+			console.log("Reached here");
+			var message=msg.split(" ");
+			var pub=message[0];
+			var sec=message[1];
+			publickey[socket.username]=pub;
+			secretkey[socket.username]=sec;
 
+			
+			checkflag[socket.username]=0;
+		}
 	})
 
 	socket.on('typing', (data) => {
