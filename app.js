@@ -32,7 +32,7 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	try
 	{
 		count = await client.count({
-  		index: 'user_data'
+		index: 'user_data'
 		});
 	}
 	
@@ -66,6 +66,9 @@ const express = require('express')
 const app = express()
 
 var users = {};
+var timer = {};
+var buyer = {};
+var sender = {};
 
 users["Anonymous"]=null
 
@@ -111,7 +114,7 @@ io.sockets.on('connection', (socket) => {
 			users[socket.username].emit("new_message", {
 				message: "Username already taken",
 				username: "Liveweaver"
-		    })
+			})
 		}
 		else
 		{
@@ -159,7 +162,8 @@ io.sockets.on('connection', (socket) => {
 					console.log("User not found");
 				}
 			} 
-			else {
+			else 
+			{
 				console.log("Fail");
 			}
 		} 
@@ -191,7 +195,76 @@ io.sockets.on('connection', (socket) => {
 			});
 
 		}
-		else {
+		else if(msg.substr(0,5)=="send ")
+		{
+			var user=msg.split(" ");
+			var name=user[1];
+			var amount=user[2];
+			users[name].emit('new_message', {
+				message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
+				username: "Liveweaver"
+			});
+			sender[socket.username]=name;
+			buyer[name]=socket.username;
+			timer[socket.username]=Date.now();
+		}
+		else if(msg=="Y"||msg=="N")
+		{
+			if(socket.username in buyer)
+			{
+				if(Date.now()-timer[buyer[socket.username]]<=10000)
+				{
+					if(msg=="Y")
+					{
+						users[socket.username].emit('new_message', 
+						{
+							message: "Transaction has been accepted",
+							username: "Liveweaver"
+						});
+						users[buyer[socket.username]].emit('new_message', 
+						{
+							message: socket.username+" has accepted the transaction",
+							username: "Liveweaver"
+						});
+						delete sender[buyer[socket.username]];
+						delete buyer[socket.username];
+					}		
+					else
+					{
+						users[socket.username].emit('new_message', 
+						{
+							message: "Transaction has been denied",
+							username: "Liveweaver"
+						});
+						users[buyer[socket.username]].emit('new_message', 
+						{
+							message: socket.username+" has denied the transaction",
+							username: "Liveweaver"
+						});
+						delete sender[buyer[socket.username]];
+						delete buyer[socket.username];
+					}	
+				}
+				else
+				{
+					users[socket.username].emit('new_message', 
+					{
+						message: "No valid transaction exists",
+						username: "Liveweaver"
+					});
+				}
+			}
+			else
+			{
+				users[socket.username].emit('new_message', 
+				{
+					message: "No valid transaction exists",
+					username: "Liveweaver"
+				});
+			}
+		}
+		else 
+		{
 			io.sockets.emit('new_message', {
 				message: data.message,
 				username: socket.username
