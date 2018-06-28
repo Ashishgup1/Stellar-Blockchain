@@ -13,7 +13,7 @@ $(function(){
 
 	function ValidateIPaddress(ipaddress) {  
 	  if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {  
-	    return (true)  
+		return (true)  
 	  }   
 	  return (false)  
 	}  
@@ -25,7 +25,7 @@ $(function(){
 			var possibleIp = message.val();
 			socket.emit('new_message', {message : message.val(), ip: ip, name:username.val()})
 		}
-	})
+	});
 
 	send_message.on("click", function(){
 		var possibleIp = message.val();
@@ -38,6 +38,14 @@ $(function(){
 		message.val('');
 		chatroom.append("<p class='message'>" + data.username + ": " + data.message + "</p>")
 	})
+
+	username.keypress(function(event){
+		
+		if(event.which == 13)
+		{
+			socket.emit('change_username', {username : username.val()})
+		}
+	});
 
 	send_username.click(function(){
 		socket.emit('change_username', {username : username.val()})
@@ -52,7 +60,11 @@ $(function(){
 	})
 
 	socket.on('disconnect', (data) => {
-	 	socket.emit('disconnect', {name: username.val()})
-  	});
+		socket.emit('disconnect', {name: username.val()})
+	});
+
+	socket.on('disconnecting', (data) => {
+		socket.emit('disconnecting', {name: username.val()})
+	});
 
 });
