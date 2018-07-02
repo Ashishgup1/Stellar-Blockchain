@@ -1,3 +1,8 @@
+// Initial requirements
+let Stellar        = require('stellar-sdk'); // Stellar JS library
+let request        = require('request-promise'); // Request library
+let stellarUtility = require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
+
 //Server Side code for elastic search
 
 var elasticsearch = require('elasticsearch');
@@ -58,6 +63,9 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	});
 }
 
+let pairIssuer  = Stellar.Keypair.random();
+
+let ZFCasset = new Stellar.Asset('ZFC', "GCFGNW3ISQSECA5EM3AHRKBBXBR33O5CS5YMR3WRAI42K4BQDR7YEHK3");
 //Server Side code for Chat Engine
 
 const alert = require ('alert-node')
@@ -96,6 +104,9 @@ function ValidateIPaddress(ipaddress) {
 	}
 	return (false)
 }
+
+for(var key in inprocess)
+	console.log(key);
 
 server = app.listen(3000)
 
@@ -219,7 +230,7 @@ io.sockets.on('connection', (socket) => {
 			{
 				if(socket.username in buyer)
 				{
-					if(Date.now()-timer[buyer[socket.username]]<=10000)
+					if(Date.now()-timer[buyer[socket.username]]<=60000)
 					{
 						if(msg=="Y")
 						{
@@ -287,9 +298,41 @@ io.sockets.on('connection', (socket) => {
 			var sec=message[1];
 			publickey[socket.username]=pub;
 			secretkey[socket.username]=sec;
-
 			
 			checkflag[socket.username]=0;
+		}
+
+		for(var key in inprocess)
+		{
+			if(inprocess.hasOwnProperty(key))
+			{
+				if(key in publickey && inprocess[key] in publickey)
+				{
+					console.log(secretkey[key]);
+					console.log(secretkey[inprocess[key]]);
+
+					var seller=await Stellar.Keypair.fromSecret(secretkey[key]);
+
+					console.log(seller.publicKey());
+
+					var buyer1=await Stellar.Keypair.fromSecret(secretkey[inprocess[key]]);
+
+					console.log(buyer1.publicKey());
+
+					var escrow=await Stellar.Keypair.fromSecret("SD43FQLUGBQT5ZOLGR2IZQ6V5PB2ME4DYBWKVUNGP7NM6OWPOZ4D2QLY");
+
+					console.log(escrow.publicKey());
+
+					stellarUtility.transact(seller, escrow, buyer1, ZFCasset, "100", "10000");
+
+					// users[socket.username].emit('new_message', 
+					// {
+					// 	message: seller.publicKey() + " & " + Stellar.Keypair.fromSecret(seller.secret()).publicKey(),
+					// 	username: "Liveweaver"
+					// });
+
+				}
+			}
 		}
 	})
 
