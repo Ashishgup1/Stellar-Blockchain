@@ -75,8 +75,9 @@ const app = express()
 
 var users = {};
 var timer = {};
-var buyer = {};
-var sender = {};
+var data_Acceptor = {};
+var money_Acceptor = {};
+var amnt = {};
 var checkflag = {};
 var inprocess = {};
 var publickey = {};
@@ -222,15 +223,16 @@ io.sockets.on('connection', (socket) => {
 					message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
 					username: "Liveweaver"
 				});
-				sender[socket.username]=name;
-				buyer[name]=socket.username;
+				money_Acceptor[socket.username]=name;
+				data_Acceptor[name]=socket.username;
+				amnt[socket.username]=amount;
 				timer[socket.username]=Date.now();
 			}
 			else if(msg=="Y"||msg=="N")
 			{
-				if(socket.username in buyer)
+				if(socket.username in data_Acceptor)
 				{
-					if(Date.now()-timer[buyer[socket.username]]<=60000)
+					if(Date.now()-timer[data_Acceptor[socket.username]]<=60000)
 					{
 						if(msg=="Y")
 						{
@@ -239,14 +241,14 @@ io.sockets.on('connection', (socket) => {
 								message: "Transaction has been accepted. Enter your public and secret key separated by a space.",
 								username: "Liveweaver"
 							});
-							users[buyer[socket.username]].emit('new_message', 
+							users[data_Acceptor[socket.username]].emit('new_message', 
 							{
 								message: socket.username+" has accepted the transaction. Enter your public and secret key separated by a space.",
 								username: "Liveweaver"
 							});
-							checkflag[buyer[socket.username]]=1;
+							checkflag[data_Acceptor[socket.username]]=1;
 							checkflag[socket.username]=1;
-							inprocess[buyer[socket.username]]=socket.username;
+							inprocess[data_Acceptor[socket.username]]=socket.username;
 						}		
 						else
 						{
@@ -255,13 +257,15 @@ io.sockets.on('connection', (socket) => {
 								message: "Transaction has been denied",
 								username: "Liveweaver"
 							});
-							users[buyer[socket.username]].emit('new_message', 
+							users[data_Acceptor[socket.username]].emit('new_message', 
 							{
 								message: socket.username+" has denied the transaction",
 								username: "Liveweaver"
 							});
-							delete sender[buyer[socket.username]];
-							delete buyer[socket.username];
+							delete money_Acceptor[data_Acceptor[socket.username]];
+							delete data_Acceptor[socket.username];
+							delete timer[data_Acceptor[socket.username]];
+							delete amnt[data_Acceptor[socket.username]];
 						}	
 					}
 					else
@@ -311,25 +315,25 @@ io.sockets.on('connection', (socket) => {
 					console.log(secretkey[key]);
 					console.log(secretkey[inprocess[key]]);
 
-					var seller=await Stellar.Keypair.fromSecret(secretkey[key]);
+					var moneySender=await Stellar.Keypair.fromSecret(secretkey[key]);
 
-					console.log(seller.publicKey());
+					console.log(moneySender.publicKey());
 
-					var buyer1=await Stellar.Keypair.fromSecret(secretkey[inprocess[key]]);
+					var dataSender=await Stellar.Keypair.fromSecret(secretkey[inprocess[key]]);
 
-					console.log(buyer1.publicKey());
+					console.log(dataSender.publicKey());
 
 					var escrow=await Stellar.Keypair.fromSecret("SD43FQLUGBQT5ZOLGR2IZQ6V5PB2ME4DYBWKVUNGP7NM6OWPOZ4D2QLY");
 
 					console.log(escrow.publicKey());
 
-					stellarUtility.transact(seller, escrow, buyer1, ZFCasset, "100", "10000");
+					var money = amnt[key];
 
-					// users[socket.username].emit('new_message', 
-					// {
-					// 	message: seller.publicKey() + " & " + Stellar.Keypair.fromSecret(seller.secret()).publicKey(),
-					// 	username: "Liveweaver"
-					// });
+					console.log(money);
+
+					console.log(typeof money);
+
+					stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, "10000");
 
 				}
 			}
