@@ -2,7 +2,7 @@
 let Stellar        = require('stellar-sdk'); // Stellar JS library
 let request        = require('request-promise'); // Request library
 let stellarUtility = require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
-
+let Set            = require("collections/set"); 
 //Server Side code for elastic search
 
 var elasticsearch = require('elasticsearch');
@@ -21,10 +21,19 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 		q: 'Keywords:' + keyword
 	});
 
+	var matches = new Set();
+
 	let searchResults = "";
 	for(var i = 0; i< ans.hits.hits.length; i++)
 	{
-		searchResults += ans.hits.hits[i]._source['username'] + '\n';
+		matches.add(ans.hits.hits[i]._source['username']);
+	}
+
+	var arr = matches.toArray();
+
+	for(var i=0;i<arr.length;i++)
+	{
+		searchResults+=arr[i] + ' ';
 	}
 
 	return searchResults;
@@ -219,14 +228,24 @@ io.sockets.on('connection', (socket) => {
 				var user=msg.split(" ");
 				var name=user[1];
 				var amount=user[2];
-				users[name].emit('new_message', {
+				if(!(name in users))
+				{
+					users[socket.username].emit('new_message', {
+					message: "Wrong username entered. Please try again.",
+					username: "Liveweaver"
+					});
+				}
+				else
+				{
+					users[name].emit('new_message', {
 					message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
 					username: "Liveweaver"
-				});
-				money_Acceptor[socket.username]=name;
-				data_Acceptor[name]=socket.username;
-				amnt[socket.username]=amount;
-				timer[socket.username]=Date.now();
+					});
+					money_Acceptor[socket.username]=name;
+					data_Acceptor[name]=socket.username;
+					amnt[socket.username]=amount;
+					timer[socket.username]=Date.now();
+				}
 			}
 			else if(msg=="Y"||msg=="N")
 			{
@@ -266,6 +285,7 @@ io.sockets.on('connection', (socket) => {
 							delete data_Acceptor[socket.username];
 							delete timer[data_Acceptor[socket.username]];
 							delete amnt[data_Acceptor[socket.username]];
+							delete inprocess[data_Acceptor[socket.username]];
 						}	
 					}
 					else
@@ -306,6 +326,8 @@ io.sockets.on('connection', (socket) => {
 			checkflag[socket.username]=0;
 		}
 
+		var temp={};
+
 		for(var key in inprocess)
 		{
 			if(inprocess.hasOwnProperty(key))
@@ -333,11 +355,21 @@ io.sockets.on('connection', (socket) => {
 
 					console.log(typeof money);
 
-					stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, "10000");
+					await stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, "10000");
 
+
+					delete money_Acceptor[key];
+					delete data_Acceptor[inprocess[key]];
+					delete timer[key];
+					delete amnt[key];
+					delete publickey[key];
+					delete publickey[inprocess[key]];
+					delete inprocess[key];
+					temp[data_Acceptor[socket.username]];
 				}
 			}
 		}
+
 	})
 
 	socket.on('typing', (data) => {
