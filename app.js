@@ -3,6 +3,42 @@ let Stellar        = require('stellar-sdk'); // Stellar JS library
 let request        = require('request-promise'); // Request library
 let stellarUtility = require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
 let Set            = require("collections/set"); 
+let Engine 		   = require('./engine.js');
+let Buyer          = require('./Buyer.js');
+let Seller         = require('./Seller.js');
+
+//Pricing Engine code
+let historyList = new Array();
+
+for(let i=0;i<10;i++)
+{
+	tempList = new Array();
+	for(let j=0;j<300;j++)
+	{
+		tempList.push(300);
+	}
+	historyList.push(tempList);
+}
+
+let gparamList = new Array();
+
+for(let i = 0;i<200;i++)
+{
+	gparamList.push(i%10);
+}
+
+function PriceEngine()
+{
+	//Need, Unique, ownerValue, Demand, Richness, Applicability, repeatedPurchase, gparam
+	let q = 0.97
+	let nHist = 200
+
+	let buyer = new Buyer(historyList, nHist, q, gparamList, 0.9, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 2),	
+		seller = new Seller(historyList, nHist, q, gparamList, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 2);
+	
+	return Engine.transact_price(buyer, seller, historyList, gparamList).toFixed(2);
+}
+
 //Server Side code for elastic search
 
 var elasticsearch = require('elasticsearch');
@@ -33,7 +69,7 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 
 	for(var i=0;i<arr.length;i++)
 	{
-		searchResults+=arr[i] + ' ';
+		searchResults+=arr[i] + ': ' +  PriceEngine() + ' ';
 	}
 
 	return searchResults;
@@ -75,6 +111,7 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 let pairIssuer  = Stellar.Keypair.random();
 
 let ZFCasset = new Stellar.Asset('ZFC', "GCFGNW3ISQSECA5EM3AHRKBBXBR33O5CS5YMR3WRAI42K4BQDR7YEHK3");
+
 //Server Side code for Chat Engine
 
 const alert = require ('alert-node')
@@ -91,6 +128,7 @@ var checkflag = {};
 var inprocess = {};
 var publickey = {};
 var secretkey = {};
+var filehash = {};
 
 users["Anonymous"]=null
 
@@ -257,7 +295,7 @@ io.sockets.on('connection', (socket) => {
 						{
 							users[socket.username].emit('new_message', 
 							{
-								message: "Transaction has been accepted. Enter your public and secret key separated by a space.",
+								message: "Transaction has been accepted. Enter your public, secret key and Hash of the file separated by one space each.",
 								username: "Liveweaver"
 							});
 							users[data_Acceptor[socket.username]].emit('new_message', 
@@ -320,6 +358,12 @@ io.sockets.on('connection', (socket) => {
 			var message=msg.split(" ");
 			var pub=message[0];
 			var sec=message[1];
+			if(socket.username in money_Acceptor)
+			{
+				var hash=message[2];
+				filehash[socket.username]=hash;
+			}
+
 			publickey[socket.username]=pub;
 			secretkey[socket.username]=sec;
 			
