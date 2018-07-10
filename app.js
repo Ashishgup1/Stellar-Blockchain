@@ -1,13 +1,23 @@
 // Initial requirements
 let Stellar				= require('stellar-sdk'); // Stellar JS library
 let request				= require('request-promise'); // Request library
-let stellarUtility = require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
-let Set						= require("collections/set"); 
-let Engine 			 = require('./engine.js');
-let Buyer					= require('./Buyer.js');
-let Seller				 = require('./Seller.js');
-let base58 			 = require("bs58");
+let stellarUtility 		= require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
+let Set					= require("collections/set"); 
+let Engine 			 	= require('./engine.js');
+let Buyer				= require('./Buyer.js');
+let Seller				= require('./Seller.js');
+let base58 				= require("bs58");
+let log4js 				= require('log4js');
 
+/*log4js.configure({
+  appenders: [
+    { type: 'console' },
+    { type: 'file', filename: 'logs/cheese.log', category: 'cheese' }
+  ]
+});
+
+var logger = log4js.getLogger('cheese'); 
+*/
 //Pricing Engine code
 let historyList = new Array();
 
@@ -109,9 +119,9 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	});
 }
 
-let pairIssuer = Stellar.Keypair.random();
+let pairIssuer = Stellar.Keypair.fromSecret("SBB76ASGMOEU7M2RIE2DXWUNCYNPQDVJQNBEPLZHOO5NXPEWWGGFSFCJ");
 
-let ZFCasset = new Stellar.Asset('ZFC', "GCFGNW3ISQSECA5EM3AHRKBBXBR33O5CS5YMR3WRAI42K4BQDR7YEHK3");
+let ZFCasset = new Stellar.Asset('ZFC', pairIssuer.publicKey());
 
 //Code for encoding and decoding IPFS Hash
 
@@ -360,6 +370,20 @@ io.sockets.on('connection', (socket) => {
 					});
 				}
 			}
+			else if(msg == "Create account")
+			{
+				console.log("Creation");
+				let newKeyPair = Stellar.Keypair.random();
+				await stellarUtility.createAndFundAccount(newKeyPair);
+   				await stellarUtility.changeTrust(newKeyPair, "10000", ZFCasset);
+    			await stellarUtility.sendAsset(pairIssuer, newKeyPair, '1000', ZFCasset);
+    			await stellarUtility.showBalance(newKeyPair);
+   				users[socket.username].emit('new_message', 
+				{
+					message: "New account created. Public Key: " + newKeyPair.publicKey() + " Secret Key: " + newKeyPair.secret(),
+					username: "Liveweaver"
+				});
+			}
 			else 
 			{
 				io.sockets.emit('new_message', {
@@ -396,6 +420,19 @@ io.sockets.on('connection', (socket) => {
 			{
 				if(key in publickey && inprocess[key] in publickey)
 				{
+					users[key].emit('new_message', 
+					{
+						message: "Transaction has started",
+						username: "Liveweaver"
+					});
+
+
+					users[inprocess[key]].emit('new_message', 
+					{
+						message: "Transaction has started",
+						username: "Liveweaver"
+					});
+
 					console.log(secretkey[key]);
 					console.log(secretkey[inprocess[key]]);
 
@@ -407,7 +444,7 @@ io.sockets.on('connection', (socket) => {
 
 					console.log(dataSender.publicKey());
 
-					var escrow=await Stellar.Keypair.fromSecret("SD43FQLUGBQT5ZOLGR2IZQ6V5PB2ME4DYBWKVUNGP7NM6OWPOZ4D2QLY");
+					var escrow=await Stellar.Keypair.fromSecret("SD3CX5QBRCHLMFRICH6WAARYO3IFE2ZQRTAWKT65FATLF253E27HQNUP");
 
 					console.log(escrow.publicKey());
 
@@ -428,9 +465,16 @@ io.sockets.on('connection', (socket) => {
 
 					var decoded = getIpfsHashFromBytes32(encoded);
 
-					users[socket.username].emit('new_message', 
+					users[key].emit('new_message', 
 					{
 						message: "The IPFS Hash of the required file is: " + decoded,
+						username: "Liveweaver"
+					});
+
+
+					users[inprocess[key]].emit('new_message', 
+					{
+						message: "You have received " + money + " ZFC tokens",
 						username: "Liveweaver"
 					});
 
