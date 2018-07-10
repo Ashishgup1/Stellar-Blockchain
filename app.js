@@ -1,11 +1,12 @@
 // Initial requirements
-let Stellar        = require('stellar-sdk'); // Stellar JS library
-let request        = require('request-promise'); // Request library
+let Stellar				= require('stellar-sdk'); // Stellar JS library
+let request				= require('request-promise'); // Request library
 let stellarUtility = require("./stellarUtilities.js"); // File containing Stellar utility functions for managing API
-let Set            = require("collections/set"); 
-let Engine 		   = require('./engine.js');
-let Buyer          = require('./Buyer.js');
-let Seller         = require('./Seller.js');
+let Set						= require("collections/set"); 
+let Engine 			 = require('./engine.js');
+let Buyer					= require('./Buyer.js');
+let Seller				 = require('./Seller.js');
+let base58 			 = require("bs58");
 
 //Pricing Engine code
 let historyList = new Array();
@@ -69,7 +70,7 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 
 	for(var i=0;i<arr.length;i++)
 	{
-		searchResults+=arr[i] + ': ' +  PriceEngine() + ' ';
+		searchResults+=arr[i] + ': ' +	PriceEngine() + ' ';
 	}
 
 	return searchResults;
@@ -108,9 +109,24 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	});
 }
 
-let pairIssuer  = Stellar.Keypair.random();
+let pairIssuer = Stellar.Keypair.random();
 
 let ZFCasset = new Stellar.Asset('ZFC', "GCFGNW3ISQSECA5EM3AHRKBBXBR33O5CS5YMR3WRAI42K4BQDR7YEHK3");
+
+//Code for encoding and decoding IPFS Hash
+
+getBytes32FromIpfsHash = (ipfsListing) => { //Encode
+	console.log(base58.decode(ipfsListing).slice(2).toString('hex'));
+	return base58.decode(ipfsListing).slice(2).toString('hex');
+}
+
+getIpfsHashFromBytes32 = (bytes32Hex) => { //Decode 
+	const hashHex = "1220" + bytes32Hex
+	const hashBytes = Buffer.from(hashHex, 'hex');
+	const hashStr = base58.encode(hashBytes)
+	console.log(hashStr);
+	return hashStr;
+}
 
 //Server Side code for Chat Engine
 
@@ -358,9 +374,11 @@ io.sockets.on('connection', (socket) => {
 			var message=msg.split(" ");
 			var pub=message[0];
 			var sec=message[1];
-			if(socket.username in money_Acceptor)
+			if(socket.username in data_Acceptor)
 			{
 				var hash=message[2];
+				console.log(socket.username);
+				console.log(hash);
 				filehash[socket.username]=hash;
 			}
 
@@ -397,10 +415,24 @@ io.sockets.on('connection', (socket) => {
 
 					console.log(money);
 
+					var hash=filehash[inprocess[key]];
+
+					console.log(hash);
+					console.log(typeof hash);
+
+					var encoded = getBytes32FromIpfsHash(hash);
+
 					console.log(typeof money);
 
-					await stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, "10000");
+					await stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, encoded, "10000");
 
+					var decoded = getIpfsHashFromBytes32(encoded);
+
+					users[socket.username].emit('new_message', 
+					{
+						message: "The IPFS Hash of the required file is: " + decoded,
+						username: "Liveweaver"
+					});
 
 					delete money_Acceptor[key];
 					delete data_Acceptor[inprocess[key]];
