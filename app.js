@@ -8,16 +8,22 @@ let Buyer				= require('./Buyer.js');
 let Seller				= require('./Seller.js');
 let base58 				= require("bs58");
 let log4js 				= require('log4js');
+let winston				= require('winston');
+let bodyParser 			= require('body-parser');
+let mysql 				= require ('mysql');
+let	fs 					= require("fs");
+function addSave(console){
 
-/*log4js.configure({
-  appenders: [
-    { type: 'console' },
-    { type: 'file', filename: 'logs/cheese.log', category: 'cheese' }
-  ]
-});
+console.save = function(data){
+		msg = data + "\n";
+		fs.appendFile("./log.txt", msg, function(){
+			console.log(data);
+		})
+	}
+}
 
-var logger = log4js.getLogger('cheese'); 
-*/
+addSave(console);
+
 //Pricing Engine code
 let historyList = new Array();
 
@@ -33,7 +39,7 @@ for(let i=0;i<10;i++)
 
 let gparamList = new Array();
 
-for(let i = 0;i<200;i++)
+for(let i=0;i<200;i++)
 {
 	gparamList.push(i%10);
 }
@@ -99,7 +105,7 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	
 	catch(err)
 	{
-		console.log(err);
+		console.save(err);
 		count.count = 0;
 	}
 
@@ -112,9 +118,9 @@ async function pushToElasticSearch(fileData) { //Used to push a user data to ela
 	obj.body = fileData;
 	client.create(obj, function(error) {
 		if (error) {
-			console.log('Error boi');
+			console.save('Error boi');
 		} else {
-			console.log('All is well boi');
+			console.save('All is well boi');
 		}
 	});
 }
@@ -126,7 +132,7 @@ let ZFCasset = new Stellar.Asset('ZFC', pairIssuer.publicKey());
 //Code for encoding and decoding IPFS Hash
 
 getBytes32FromIpfsHash = (ipfsListing) => { //Encode
-	console.log(base58.decode(ipfsListing).slice(2).toString('hex'));
+	console.save(base58.decode(ipfsListing).slice(2).toString('hex'));
 	return base58.decode(ipfsListing).slice(2).toString('hex');
 }
 
@@ -134,7 +140,7 @@ getIpfsHashFromBytes32 = (bytes32Hex) => { //Decode
 	const hashHex = "1220" + bytes32Hex
 	const hashBytes = Buffer.from(hashHex, 'hex');
 	const hashStr = base58.encode(hashBytes)
-	console.log(hashStr);
+	console.save(hashStr);
 	return hashStr;
 }
 
@@ -180,7 +186,7 @@ function ValidateIPaddress(ipaddress) {
 }
 
 for(var key in inprocess)
-	console.log(key);
+	console.save(key);
 
 server = app.listen(3000)
 
@@ -241,22 +247,22 @@ io.sockets.on('connection', (socket) => {
 							message: msg,
 							username: "You whispered to " + name
 						})
-						console.log("Whisper");
+						console.save("Whisper");
 					} 
 					else 
 					{
-						console.log(data.name);
+						console.save(data.name);
 						users[data.name].emit("new_message", {
 							message: "Wrong username",
 							username: "Liveweaver"
 						})
 						alert("Error", "Wrong username entered");
-						console.log("User not found");
+						console.save("User not found");
 					}
 				} 
 				else 
 				{
-					console.log("Fail");
+					console.save("Fail");
 				}
 			} 
 			else if(msg.substr(0, 4)=="add ")
@@ -372,7 +378,7 @@ io.sockets.on('connection', (socket) => {
 			}
 			else if(msg == "Create account")
 			{
-				console.log("Creation");
+				console.save("Creation");
 				let newKeyPair = Stellar.Keypair.random();
 				await stellarUtility.createAndFundAccount(newKeyPair);
    				await stellarUtility.changeTrust(newKeyPair, "10000", ZFCasset);
@@ -394,15 +400,15 @@ io.sockets.on('connection', (socket) => {
 		}
 		else
 		{
-			console.log("Reached here");
+			console.save("Reached here");
 			var message=msg.split(" ");
 			var pub=message[0];
 			var sec=message[1];
 			if(socket.username in data_Acceptor)
 			{
 				var hash=message[2];
-				console.log(socket.username);
-				console.log(hash);
+				console.save(socket.username);
+				console.save(hash);
 				filehash[socket.username]=hash;
 			}
 
@@ -433,33 +439,33 @@ io.sockets.on('connection', (socket) => {
 						username: "Liveweaver"
 					});
 
-					console.log(secretkey[key]);
-					console.log(secretkey[inprocess[key]]);
+					console.save(secretkey[key]);
+					console.save(secretkey[inprocess[key]]);
 
 					var moneySender=await Stellar.Keypair.fromSecret(secretkey[key]);
 
-					console.log(moneySender.publicKey());
+					console.save(moneySender.publicKey());
 
 					var dataSender=await Stellar.Keypair.fromSecret(secretkey[inprocess[key]]);
 
-					console.log(dataSender.publicKey());
+					console.save(dataSender.publicKey());
 
 					var escrow=await Stellar.Keypair.fromSecret("SD3CX5QBRCHLMFRICH6WAARYO3IFE2ZQRTAWKT65FATLF253E27HQNUP");
 
-					console.log(escrow.publicKey());
+					console.save(escrow.publicKey());
 
 					var money = amnt[key];
 
-					console.log(money);
+					console.save(money);
 
 					var hash=filehash[inprocess[key]];
 
-					console.log(hash);
-					console.log(typeof hash);
+					console.save(hash);
+					console.save(typeof hash);
 
 					var encoded = getBytes32FromIpfsHash(hash);
 
-					console.log(typeof money);
+					console.save(typeof money);
 
 					await stellarUtility.transact(dataSender, escrow, moneySender, ZFCasset, money, encoded, "10000");
 
