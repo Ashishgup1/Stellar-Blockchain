@@ -9,14 +9,15 @@ $(function(){
 	var hiddenInput = $("#address")
 	var ip = hiddenInput.attr("value")
 
-	var socket = io.connect("http://192.168.137.31:3000");
+	//Enter IP address where the chat is to be hosted
+	var socket = io.connect("http://192.168.137.31:3000"); 
 
-	function ValidateIPaddress(ipaddress) {  
-	  if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {  
-		return (true)  
-	  }   
-	  return (false)  
-	}  
+	function ValidateIPaddress(ipaddress) {	
+		if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {	
+		return (true)	
+		}	 
+		return (false)	
+	}	
 
 	message.keypress(function(event){
 		console.log(event);
