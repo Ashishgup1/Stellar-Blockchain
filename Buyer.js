@@ -12,7 +12,7 @@ class Buyer
 {
 	constructor(historyList, nHist, q, gparamList, need, unique, ownerValue, demand, richness, applicability, repeatedPurchase, gparam)
 	{
-		this.p = 0.1;
+		this.p = 0.2;
 		this.c = 0.9;
 		this.w1 = 1/7;
 		this.w2 = 1/7;
@@ -30,8 +30,7 @@ class Buyer
 		this.repeatedPurchase 	= repeatedPurchase;
 		this.gparam 			= gparam;
 		this.trend 				= getTrend(10, nHist, this.gparam, gparamList);
-		console.log(gparam)
-		console.log()
+
 		let mean = sum(historyList[this.gparam].slice(-nHist))/nHist;
 		this.bidPrice = (mean*q)*(1+this.c*Math.max(this.trend-0.1,0));
 		let num = this.w1*this.need 
