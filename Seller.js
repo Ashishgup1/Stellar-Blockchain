@@ -22,7 +22,7 @@ class Seller
 {
 	constructor(historyList, nHist, q, gparamList, need, unique, ownerValue, demand, richness, applicability, repeatedPurchase, gparam)
 	{
-		this.p = 0.1;
+		this.p = 0.2;
 		this.c = 0.9;
 		this.w1 = 1/7;
 		this.w2 = 1/7;
