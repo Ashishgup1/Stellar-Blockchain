@@ -6,12 +6,11 @@ let Set					= require("collections/set");
 let Engine 			 	= require('./engine.js');
 let Buyer				= require('./Buyer.js');
 let Seller				= require('./Seller.js');
-let base58 				= require("bs58");
-let log4js 				= require('log4js');
-let winston				= require('winston');
+let base58 				= require('bs58');
 let bodyParser 			= require('body-parser');
 let mysql 				= require ('mysql');
-let	fs 					= require("fs");
+let	fs 					= require('fs');
+
 function addSave(console){
 
 console.save = function(data){
@@ -44,19 +43,34 @@ for(let i=0;i<200;i++)
 	gparamList.push(i%10);
 }
 
-function PriceEngine()
+function PriceEngine(needbuyer, needseller, gParam) //Returns the optimal price for 
 {
+
+	var needb=parseFloat(needbuyer);
+	var needs=parseFloat(needseller);
+
 	//Need, Unique, ownerValue, Demand, Richness, Applicability, repeatedPurchase, gparam
 	let q = 0.97
 	let nHist = 200
 
-	let buyer = new Buyer(historyList, nHist, q, gparamList, 0.9, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 2),	
-		seller = new Seller(historyList, nHist, q, gparamList, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 2);
+	let buyer = new Buyer(historyList, nHist, q, gparamList, needb, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, gParam),	
+		seller = new Seller(historyList, nHist, q, gparamList, needs, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, gParam);
 	
 	return Engine.transact_price(buyer, seller, historyList, gparamList).toFixed(2);
 }
 
+function saveRecord(priceSold, gparam, historyList, gparamList)
+{
+	if(priceSold != 0)
+	{
+		historyList[gparam].push(priceSold);
+		gparamList.push(gparam);
+	}
+}
+
 //Server Side code for elastic search
+
+let sellerNeed = {};
 
 var elasticsearch = require('elasticsearch');
 
@@ -67,7 +81,8 @@ var client = new elasticsearch.Client({
 	log: 'trace'
 });
 
-async function getPossibleUserNames(keyword) { //Used to query database for keyword and return a list of possible usernames
+//Used to query database for keyword and return a list of possible usernames
+async function getPossibleUserNames(keyword, needbuyer) { 
 
 	var ans = await client.search({
 		index: 'user_data',
@@ -82,17 +97,25 @@ async function getPossibleUserNames(keyword) { //Used to query database for keyw
 		matches.add(ans.hits.hits[i]._source['username']);
 	}
 
-	var arr = matches.toArray();
-
-	for(var i=0;i<arr.length;i++)
+	var users = matches.toArray();
+	console.log(users);
+	console.log("****");
+	for(var i=0;i<users.length;i++)
 	{
-		searchResults+=arr[i] + ': ' +	PriceEngine() + ' ';
+		var name = users[i];
+
+		if(sellerNeed[name] !== undefined && sellerNeed[name][keyword] !== undefined)
+		{
+			var needseller = sellerNeed[name][keyword];
+			searchResults+= users[i] + ': ' +	PriceEngine(needbuyer, needseller, keytonum[keyword]) + ' ';
+		}
 	}
 
 	return searchResults;
 }
 
-async function pushToElasticSearch(fileData) { //Used to push a user data to elastic search
+//Used to push a user data to elastic search
+async function pushToElasticSearch(fileData) { 
 
 	let count = {};
 
@@ -151,6 +174,7 @@ const alert = require ('alert-node')
 const express = require('express')
 const app = express()
 
+var keys=0;
 var users = {};
 var timer = {};
 var data_Acceptor = {};
@@ -161,6 +185,7 @@ var inprocess = {};
 var publickey = {};
 var secretkey = {};
 var filehash = {};
+var keytonum = {};
 
 users["Anonymous"]=null
 
@@ -267,11 +292,27 @@ io.sockets.on('connection', (socket) => {
 			} 
 			else if(msg.substr(0, 4)=="add ")
 			{
-				var keywords=msg.substr(4);
+
+				var message = msg.split(" ");
+
+				var need = message[1];
+
+				for(var i=2;i<message.length;i++)
+				{
+					var keyword = message[i];
+					var pair1= Pair([socket.username, keyword]);
+					var name = socket.username;
+					sellerNeed[name] = {};
+					sellerNeed[name][keyword] = need;
+					if(keyword in keytonum)
+						continue;
+					keytonum[keyword]=keys++;
+					keys%=11;	
+				}
 
 				let fileData = {
 					username : socket.username,
-					Keywords : keywords
+					Keywords : keyword
 				};
 
 				await pushToElasticSearch(fileData);
@@ -283,9 +324,13 @@ io.sockets.on('connection', (socket) => {
 			}
 			else if(msg.substr(0, 9)=="retrieve ")
 			{
-				var keywords=msg.substr(9);
+				var message = msg.split(" ");
+				
+				var need = message[1];
 
-				var usernames= await getPossibleUserNames(keywords);
+				var keyword = message[2];
+
+				var usernames= await getPossibleUserNames(keyword, need);
 
 				users[socket.username].emit('new_message', {
 					message: "These usernames have the required information:\n" + usernames,
@@ -308,7 +353,7 @@ io.sockets.on('connection', (socket) => {
 				else
 				{
 					users[name].emit('new_message', {
-					message: socket.username+" wants to send you " + amount +" ZFC in exchange of the data, do you want to proceed with the transaction? (Press Y/N)",
+					message: socket.username+" is willing to send you " + amount +" ZFC in exchange of the data. Type \"Yes\" to accept, \"No\" to reject and \"Neg\" to negotiate",
 					username: "Liveweaver"
 					});
 					money_Acceptor[socket.username]=name;
@@ -317,46 +362,79 @@ io.sockets.on('connection', (socket) => {
 					timer[socket.username]=Date.now();
 				}
 			}
-			else if(msg=="Y"||msg=="N")
+			else if(msg=="Yes"||msg=="No"||msg.substr(0,3)=="Neg")
 			{
-				if(socket.username in data_Acceptor)
+				if(socket.username in data_Acceptor || socket.username in money_Acceptor)
 				{
-					if(Date.now()-timer[data_Acceptor[socket.username]]<=60000)
+					var data_seller, data_acceptor;
+					if(socket.username in data_Acceptor)
 					{
-						if(msg=="Y")
+						data_seller=socket.username;
+						data_acceptor=data_Acceptor[data_seller];
+					}
+					else
+					{
+						data_acceptor=socket.username;
+						data_seller=money_Acceptor[data_acceptor];
+					}
+					if(Date.now()-timer[data_acceptor]<=120000)
+					{
+						if(msg=="Yes")
 						{
-							users[socket.username].emit('new_message', 
+							users[data_seller].emit('new_message', 
 							{
 								message: "Transaction has been accepted. Enter your public, secret key and Hash of the file separated by one space each.",
 								username: "Liveweaver"
 							});
-							users[data_Acceptor[socket.username]].emit('new_message', 
+							users[data_acceptor].emit('new_message', 
 							{
-								message: socket.username+" has accepted the transaction. Enter your public and secret key separated by a space.",
+								message: "Transaction has been accepted. Enter your public and secret key separated by a space.",
 								username: "Liveweaver"
 							});
-							checkflag[data_Acceptor[socket.username]]=1;
-							checkflag[socket.username]=1;
-							inprocess[data_Acceptor[socket.username]]=socket.username;
+							checkflag[data_acceptor]=1;
+							checkflag[data_seller]=1;
+							inprocess[data_acceptor]=data_seller;
 						}		
-						else
+						else if(msg=="No")
 						{
-							users[socket.username].emit('new_message', 
+							users[data_acceptor].emit('new_message', 
 							{
 								message: "Transaction has been denied",
 								username: "Liveweaver"
 							});
-							users[data_Acceptor[socket.username]].emit('new_message', 
+							users[data_seller].emit('new_message', 
 							{
-								message: socket.username+" has denied the transaction",
+								message: "Transaction has been denied",
 								username: "Liveweaver"
 							});
-							delete money_Acceptor[data_Acceptor[socket.username]];
-							delete data_Acceptor[socket.username];
-							delete timer[data_Acceptor[socket.username]];
-							delete amnt[data_Acceptor[socket.username]];
-							delete inprocess[data_Acceptor[socket.username]];
+							delete money_Acceptor[data_acceptor];
+							delete data_Acceptor[data_seller];
+							delete timer[data_acceptor];
+							delete amnt[data_acceptor];
+							delete inprocess[data_acceptor];
 						}	
+						else
+						{
+							var message=msg.split(" ");
+							var amount=message[1];
+							amnt[data_acceptor]=amount;
+							if(socket.username == data_seller)
+							{
+								users[data_acceptor].emit('new_message', 
+								{
+									message: data_seller + " is willing to sell his data at " + amount + "ZFCs. Type \"Yes\" to accept, \"No\" to reject and \"Neg\" to negotiate",
+									username: "Liveweaver"
+								});
+							}
+							else
+							{
+								users[data_seller].emit('new_message', 
+								{
+									message: data_acceptor + " is willing to send you " + amount + "ZFCs in exchange of the data. Type \"Yes\" to accept, \"No\" to reject and \"Neg\" to negotiate",
+									username: "Liveweaver"
+								});
+							}
+						}
 					}
 					else
 					{
@@ -483,6 +561,12 @@ io.sockets.on('connection', (socket) => {
 						message: "You have received " + money + " ZFC tokens",
 						username: "Liveweaver"
 					});
+
+					var intMoney = parseInt(money);
+
+					console.log(intMoney);
+
+					saveRecord(money, Seller.gparam,)
 
 					delete money_Acceptor[key];
 					delete data_Acceptor[inprocess[key]];
